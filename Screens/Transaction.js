@@ -1,24 +1,25 @@
 import React, { Component } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image } from "react-native";
 import * as Permissions from "expo-permissions";
-import { Camera } from "expo-camera";
+
 import { BarCodeScanner } from "expo-barcode-scanner";
 
-export default class TransactionScreen extends Component {
+export default class Transaction extends Component {
   constructor(props) {
     super(props);
     this.state = {
       buttonState: "normal",
       hasCameraPermissions: null,
-      scanned: false, 
-      scannedData: ""
+      scanned: false,
+      scannedBookId: '',
+      scannedStudentId:'',
     };
   }
 
-  getCameraPermissions = async () => {
+  getCameraPermissions = async (id) => {
     const { status } = await Permissions.askAsync(Permissions.CAMERA);
-  // const response= await Permissions.askAsync(Permissions.CAMERA);
-  // console.log(response);
+    // const response= await Permissions.askAsync(Permissions.CAMERA);
+    // console.log(response);
     // const { per } = await Permissions.askAsync(Permissions.MEDIA_LIBRARY); 
     console.log(status);
     this.setState({
@@ -28,24 +29,43 @@ export default class TransactionScreen extends Component {
       //buttonState = "normal" or buttonState = "clicked"
       //buttonState will be 'normal' when the application starts. 
       //When the button is clicked to get camera permissions, buttonState should change to 'scanner'.
-      buttonState: "clicked",
+      // buttonState: "clicked",
+      buttonState: id,
       hasCameraPermissions: status === "granted",
       scanned: false
     });
-    
+
   };
 
   handleBarCodeScanned = async ({ type, data }) => {
-    this.setState({
-      scannedData: data,
-      buttonState: "normal",
-      scanned: true
-    });
+    // this.setState({
+    //   scannedData: data,
+    //   buttonState: "normal",
+    //   scanned: true
+    // });
+
+    const {buttonState} = this.state
+
+    if(buttonState==="BookId"){
+      this.setState({
+        scanned: true,
+        scannedBookId: data,
+        buttonState: 'normal'
+      });
+    }
+    else if(buttonState==="StudentId"){
+      this.setState({
+        scanned: true,
+        scannedStudentId: data,
+        buttonState: 'normal'
+      });
+    }
+    
   };
 
   render() {
     const { buttonState, hasCameraPermissions, scannedData, scanned } = this.state;
-    if (buttonState === "clicked" && hasCameraPermissions===true) {
+    if (buttonState !== 'normal' && hasCameraPermissions === true) {
       return (
         <BarCodeScanner
           onBarCodeScanned={scanned ? undefined : this.handleBarCodeScanned}
@@ -57,23 +77,38 @@ export default class TransactionScreen extends Component {
         // <Camera></Camera>
       );
     }
-    else if (buttonState === "clicked" && hasCameraPermissions===false) {
-      return (
-       <Text>Permission Denied</Text>
-      );
-    }
-    else {
+    else if (buttonState === "normal"){
       return (
         <View style={styles.container}>
-          <Text style={styles.text}>
-            {hasCameraPermissions ? scannedData : "Request for Camera Permission"}
-          </Text>
-          <TouchableOpacity
-            style={[styles.button, { marginTop: 25 }]}
-            onPress={() => this.getCameraPermissions()}
-          >
-            <Text style={styles.buttonText}>Scan QR Code</Text>
-          </TouchableOpacity>
+
+          <View>
+            <Image source={require("../assets/booklogo.jpg")} style={{ width: 200, height: 200 }} />
+            <Text style={{ textAlign: 'center', fontSize: 30 }}>Wily</Text>
+          </View>
+
+          <View style={styles.inputView}>
+            <TextInput 
+              style={styles.inputBox} 
+              placeholder="Book Id" 
+              value={this.state.scannedBookId} 
+              onChangeText={text => this.setState({scannedBookId:text})}
+              />
+            <TouchableOpacity style={styles.scanButton} onPress={() => { this.getCameraPermissions("BookId") }}>
+              <Text style={styles.buttonText}>Scan</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.inputView}>
+            <TextInput 
+              style={styles.inputBox} 
+              placeholder="Student Id" 
+              value={this.state.scannedStudentId} 
+              onChangeText={text => this.setState({scannedStudentId:text})}
+              />
+            <TouchableOpacity style={styles.scanButton} onPress={() => { this.getCameraPermissions("StudentId") }}>
+              <Text style={styles.buttonText}>Scan</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       );
 
@@ -85,24 +120,35 @@ export default class TransactionScreen extends Component {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#5653D4"
+    justifyContent: 'center',
+    alignItems: 'center'
   },
-  text: {
-    color: "#ffff",
-    fontSize: 15
+  displayText:{
+    fontSize: 15,
+    textDecorationLine: 'underline'
   },
-  button: {
-    width: "43%",
-    height: 55,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F48D20",
-    borderRadius: 15
+  inputView:{
+    flexDirection: 'row',
+    margin: 20
   },
-  buttonText: {
-    fontSize: 24,
-    color: "#FFFFFF"
+  
+  inputBox:{
+    width: 200,
+    height: 40,
+    borderWidth: 1.5,
+    borderRightWidth: 0,
+    fontSize: 20
+  },
+  buttonText:{
+    fontSize: 15,
+    textAlign: 'center',
+    marginTop: 10
+  },
+ 
+  scanButton:{
+    backgroundColor: '#66BB6A',
+    width: 50,
+    borderWidth: 1.5,
+    borderLeftWidth: 0
   }
 });
