@@ -1,19 +1,33 @@
-import React from 'react';
-import { NavigationContainer } from "@react-navigation/native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import React, { Component } from "react";
+import { Rajdhani_600SemiBold } from "@expo-google-fonts/rajdhani";
+import * as Font from "expo-font";
 
-import Transaction from "./Screens/Transaction";
-import Search from "./Screens/Search";
+import BottomTabNavigator from "./components/BottomTabNavigator";
 
-const Tab = createBottomTabNavigator();
+export default class App extends Component {
+  constructor() {
+    super();
+    this.state = {
+      fontLoaded: false
+    };
+  }
 
-export default function App() {
-  return (
-    <NavigationContainer>
-    <Tab.Navigator>
-      <Tab.Screen name="Transaction" component={Transaction} />
-      <Tab.Screen name="Search" component={Search} />
-    </Tab.Navigator>
-  </NavigationContainer>
-  );
+  async loadFonts() {
+    await Font.loadAsync({
+      Rajdhani_600SemiBold: Rajdhani_600SemiBold
+    });
+    this.setState({ fontLoaded: true });
+  }
+
+  componentDidMount() {
+    this.loadFonts();
+  }
+
+  render() {
+    const { fontLoaded } = this.state;
+    if (fontLoaded) {
+      return <BottomTabNavigator />;
+    }
+    return null;
+  }
 }
