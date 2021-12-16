@@ -55,18 +55,21 @@ export default class TransactionScreen extends React.Component {
   
   handleTransaction = async()=>{
     var transactionMessage = null;
-    db.collection("books").doc(this.state.scannedBookId).get()
+    db.collection("books")
+    .doc(this.state.scannedBookId)
+    .get()
     .then((doc)=>{
+      conole.log(doc.data())
       var book = doc.data()
       if(book.bookAvailability){
         this.initiateBookIssue();
         transactionMessage = "Book Issued"
-        alert(transactionMessage)
+       // alert(transactionMessage)
       }
       else{
         this.initiateBookReturn();
         transactionMessage = "Book Returned"
-        alert(transactionMessage)
+     //   alert(transactionMessage)
       }
     })
 
