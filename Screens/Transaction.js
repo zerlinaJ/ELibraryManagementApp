@@ -1,198 +1,252 @@
-import React, { Component } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, ImageBackground } from "react-native";
-import * as Permissions from "expo-permissions";
+import React from 'react';
+import { Text, View, TouchableOpacity, TextInput, Image, StyleSheet, KeyboardAvoidingView } from 'react-native';
+import * as Permissions from 'expo-permissions';
+import { BarCodeScanner } from 'expo-barcode-scanner';
+import firebase from 'firebase';
+import db from '../config'
 
-import { BarCodeScanner } from "expo-barcode-scanner";
-
-const bgImage = require("../assets/background2.png");
-const appIcon = require("../assets/appIcon.png");
-const appName = require("../assets/appName.png");
-
-export default class Transaction extends Component {
-  constructor(props) {
-    super(props);
+export default class TransactionScreen extends React.Component {
+  constructor() {
+    super();
     this.state = {
-      buttonState: "normal",
       hasCameraPermissions: null,
       scanned: false,
       scannedBookId: '',
-      scannedStudentId:'',
-    };
+      scannedStudentId: '',
+      buttonState: 'normal',
+      transactionMessage: null
+    }
   }
 
   getCameraPermissions = async (id) => {
     const { status } = await Permissions.askAsync(Permissions.CAMERA);
-    // const response= await Permissions.askAsync(Permissions.CAMERA);
-    // console.log(response);
-    // const { per } = await Permissions.askAsync(Permissions.MEDIA_LIBRARY); 
-    console.log(status);
+
     this.setState({
       /*status === "granted" is true when user has granted permission
-          status === "granted" is false when user has not granted the permission
-        */
-      //buttonState = "normal" or buttonState = "clicked"
-      //buttonState will be 'normal' when the application starts. 
-      //When the button is clicked to get camera permissions, buttonState should change to 'scanner'.
-      // buttonState: "clicked",
-      buttonState: id,
+        status === "granted" is false when user has not granted the permission
+      */
       hasCameraPermissions: status === "granted",
+      buttonState: id,
       scanned: false
     });
-
-  };
+  }
 
   handleBarCodeScanned = async ({ type, data }) => {
-    // this.setState({
-    //   scannedData: data,
-    //   buttonState: "normal",
-    //   scanned: true
-    // });
+    const { buttonState } = this.state
 
-    const {buttonState} = this.state
-
-    if(buttonState==="BookId"){
+    if (buttonState === "BookId") {
       this.setState({
         scanned: true,
         scannedBookId: data,
         buttonState: 'normal'
       });
     }
-    else if(buttonState==="StudentId"){
+    else if (buttonState === "StudentId") {
       this.setState({
         scanned: true,
         scannedStudentId: data,
         buttonState: 'normal'
       });
     }
-    
-  };
+
+  }
+
+
+  
+  handleTransaction = async()=>{
+    var transactionMessage = null;
+    db.collection("books").doc(this.state.scannedBookId).get()
+    .then((doc)=>{
+      var book = doc.data()
+      if(book.bookAvailability){
+        this.initiateBookIssue();
+        transactionMessage = "Book Issued"
+        alert(transactionMessage)
+      }
+      else{
+        this.initiateBookReturn();
+        transactionMessage = "Book Returned"
+        alert(transactionMessage)
+      }
+    })
+
+    this.setState({
+      transactionMessage : transactionMessage
+    })
+  }
+
+
+  
+  initiateBookIssue = async ()=>{
+    //add a transaction
+    db.collection("transaction").add({
+      studentId : this.state.scannedStudentId,
+      bookId : this.state.scannedBookId,
+      date : firebase.firestore.Timestamp.now().toDate(),
+      transactionType : "Issue"
+    })
+
+    //change book status
+    db.collection("books").doc(this.state.scannedBookId).update({
+      bookAvailability : false
+    })
+    //change number of issued books for student
+    db.collection("students").doc(this.state.scannedStudentId).update({
+      noOfBooksIssued : firebase.firestore.FieldValue.increment(1)
+    })
+
+    this.setState({
+      scannedStudentId : '',
+      scannedBookId: '',
+      transactionMessage:'Book Issued'
+    })
+    alert("Book Issued");
+  }
+
+
+  initiateBookReturn = async ()=>{
+    //add a transaction
+    db.collection("transaction").add({
+      studentId : this.state.scannedStudentId,
+      bookId : this.state.scannedBookId,
+      date   : firebase.firestore.Timestamp.now().toDate(),
+      transactionType : "Return"
+    })
+
+    //change book status
+    db.collection("books").doc(this.state.scannedBookId).update({
+      bookAvailability : true
+    })
+
+    //change book status
+    db.collection("students").doc(this.state.scannedStudentId).update({
+      noOfBooksIssued : firebase.firestore.FieldValue.increment(-1)
+    })
+
+    this.setState({
+      scannedStudentId : '',
+      scannedBookId : '',
+      transactionMessage:'Book Returned'
+    })
+    alert("Book Returned");
+  }
 
   render() {
-    const { buttonState, hasCameraPermissions, scannedData, scanned } = this.state;
-    if (buttonState !== 'normal' && hasCameraPermissions === true) {
+    const hasCameraPermissions = this.state.hasCameraPermissions;
+    const scanned = this.state.scanned;
+    const buttonState = this.state.buttonState;
+
+    if (buttonState !== "normal" && hasCameraPermissions) {
       return (
         <BarCodeScanner
           onBarCodeScanned={scanned ? undefined : this.handleBarCodeScanned}
-          //onBarCodeScanned is like onPress, 
-          //onPress = {this.doSomething}, Similarly, 
-          //onBarCodeScanned = {this.handleBarCodeScanned} -- this gets called only when scanned is false, ie. if scanning is not already done
-          style={StyleSheet.absoluteFillObject} //absoluteFillObject is predefined
+          style={StyleSheet.absoluteFillObject}
         />
-        // <Camera></Camera>
       );
     }
-    else if (buttonState === "normal"){
+
+    else if (buttonState === "normal") {
       return (
-        <View style={styles.container}>
-        <ImageBackground source={bgImage} style={styles.bgImage}>
-          <View style={styles.upperContainer}>
-            <Image source={appIcon} style={styles.appIcon} />
-            <Image source={appName} style={styles.appName} />
+        <KeyboardAvoidingView style={styles.container} behavior='padding' enabled>
+          <View>
+            <Image
+              source={require("../assets/booklogo.jpg")}
+              style={{ width: 200, height: 200 }} />
+            <Text style={{ textAlign: 'center', fontSize: 30 }}>Wily</Text>
           </View>
-          <View style={styles.lowerContainer}>
-            <View style={styles.textinputContainer}>
-              <TextInput
-                style={styles.textinput}
-                placeholder={"Book Id"}
-                placeholderTextColor={"#FFFFFF"}
-                value={this.state.scannedBookId}
+          <View style={styles.inputView}>
+            <TextInput
+              style={styles.inputBox}
+              placeholder="Book Id"
+              onChangeText={text => this.setState({scannedBookId:text})}
+              value={this.state.scannedBookId.toUpperCase()} 
               />
-              <TouchableOpacity
-                style={styles.scanbutton}
-                onPress={() => this.getCameraPermissions("BookId")}
-              >
-                <Text style={styles.scanbuttonText}>Scan</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={[styles.textinputContainer, { marginTop: 25 }]}>
-              <TextInput
-                style={styles.textinput}
-                placeholder={"Student Id"}
-                placeholderTextColor={"#FFFFFF"}
-                value={this.state.scannedStudentId}
-              />
-              <TouchableOpacity
-                style={styles.scanbutton}
-                onPress={() => this.getCameraPermissions("StudentId")}
-              >
-                <Text style={styles.scanbuttonText}>Scan</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.scanButton}
+              onPress={() => {
+                this.getCameraPermissions("BookId")
+              }}>
+              <Text style={styles.buttonText}>Scan</Text>
+            </TouchableOpacity>
           </View>
-        </ImageBackground>
-      </View>
+          <View style={styles.inputView}>
+            <TextInput
+              style={styles.inputBox}
+              placeholder="Student Id"
+              onChangeText={text => this.setState({scannedStudentId:text})}
+              value={this.state.scannedStudentId.toUpperCase()} />
+            <TouchableOpacity
+              style={styles.scanButton}
+              onPress={() => {
+                this.getCameraPermissions("StudentId")
+              }}>
+              <Text style={styles.buttonText}>Scan</Text>
+            </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={async () => {
+                var transactionMessage = await this.handleTransaction();
+              }}>
+              <Text style={styles.submitButtonText}>Submit</Text>
+              
+            </TouchableOpacity>
+            <Text>{this.state.transactionMessage}</Text>
+
+        
+        </KeyboardAvoidingView>
       );
-
-
     }
   }
 }
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF"
+    justifyContent: 'center',
+    alignItems: 'center'
   },
-  bgImage: {
-    flex: 1,
-    resizeMode: "cover",
-    justifyContent: "center"
+  displayText: {
+    fontSize: 15,
+    textDecorationLine: 'underline'
   },
-  upperContainer: {
-    flex: 0.5,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop:50
-  },
-  appIcon: {
-    width: 200,
-    height: 200,
-    resizeMode: "contain",
-    marginTop: 80
-  },
-  appName: {
-    width: 80,
-    height: 80,
-    marginBottom: 50,
-    resizeMode: "contain"
-  },
-  lowerContainer: {
-    flex: 0.5,
-    alignItems: "center",
-    marginTop:50
-  },
-  textinputContainer: {
-    borderWidth: 2,
-    borderRadius: 10,
-    flexDirection: "row",
-    backgroundColor: "#9DFD24",
-    borderColor: "#FFFFFF"
-  },
-  textinput: {
-    width: "57%",
-    height: 50,
+  scanButton: {
+    backgroundColor: '#2196F3',
     padding: 10,
-    borderColor: "#FFFFFF",
-    borderRadius: 10,
-    borderWidth: 3,
-    fontSize: 18,
-    backgroundColor: "#5653D4",
-    fontFamily: "Rajdhani_600SemiBold",
-    color: "#FFFFFF"
+    margin: 10
   },
-  scanbutton: {
+  buttonText: {
+    fontSize: 15,
+    textAlign: 'center',
+    marginTop: 10
+  },
+  inputView: {
+    flexDirection: 'row',
+    margin: 20
+  },
+  inputBox: {
+    width: 200,
+    height: 40,
+    borderWidth: 1.5,
+    borderRightWidth: 0,
+    fontSize: 20
+  },
+  scanButton: {
+    backgroundColor: '#66BB6A',
+    width: 50,
+    borderWidth: 1.5,
+    borderLeftWidth: 0
+  },
+  submitButton: {
+    backgroundColor: '#FBC02D',
     width: 100,
-    height: 50,
-    backgroundColor: "#9DFD24",
-    borderTopRightRadius: 10,
-    borderBottomRightRadius: 10,
-    justifyContent: "center",
-    alignItems: "center"
+    height: 50
   },
-  scanbuttonText: {
-    fontSize: 24,
-    color: "#0A0101",
-    fontFamily: "Rajdhani_600SemiBold"
+  submitButtonText: {
+    padding: 10,
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: "bold",
+    color: 'white'
   }
 });
